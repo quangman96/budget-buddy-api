@@ -2,34 +2,34 @@ name: Deploy to Production
 
 on:
   push:
-    branches:
-      - master2
+    branches: [ master ]
 
 jobs:
-  deploy_production:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
-      - name: Set up SSH keys and dependencies
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install rsync -y && sudo apt-get install openssh-server -y
+
+      - name: Set up SSH
         run: |
-          sudo apt-get update && sudo apt-get install rsync -y && sudo apt-get install openssh-server -y
           mkdir -p ~/.ssh
           echo "${{ secrets.PROD_SSH }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H 13.228.175.65 >> ~/.ssh/known_hosts
           echo "${{ secrets.PROD_ENV }}" > .env
-        env:
-          PROD_SSH: ${{ secrets.PROD_SSH }}
-          PROD_ENV: ${{ secrets.PROD_ENV }}
 
-      - name: Deploy to the second server
-        run: |
-          rsync --progress -avzh -e "ssh -i ~/.ssh/id_rsa" --rsync-path="sudo rsync" --exclude='.git' --delete . ubuntu@13.228.175.65:~/budget-buddy-api
-          ssh -i ~/.ssh/id_rsa "ubuntu@13.228.175.65" "cd budget-buddy-api"
+      - name: Install yarn dependencies
+        run: yarn install
 
-    env:
-      PROD_SSH: ${{ secrets.PROD_SSH }}
-      PROD_ENV: ${{ secrets.PROD_ENV }}
+      - name: Build the application
+        run: yarn build
+
+      - name: Deploy to production
+        run: rsync --progress -avzh -e "ssh -i /home/gitlab-runner/.ssh/id_rsa" --rsync-path="sudo rsync" --exclude='.git' --delete . ubuntu@13.228.175.65:~/budget-buddy-api
+
+      - name: Start the application
+        run: ssh -i ~/.ssh/id_rsa "ubuntu@13.228.175.65" "cd budget-buddy-api && pm2 start ecosystem.config.js"
