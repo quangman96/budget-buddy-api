@@ -9,7 +9,7 @@ import {
 } from '@nestjs/common';
 import { BudgetService } from './budget.service';
 
-@Controller('budget')
+@Controller('api/budget')
 export class BudgetController {
   constructor(private readonly budgetService: BudgetService) {}
 
